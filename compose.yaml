@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: group00/deadlineku:week6
+    image: group12/deadlineku:week6
     container_name: deadlineku-app
     ports:
       - "${HOST_PORT:-8080}:3000"
