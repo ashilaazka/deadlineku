@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeadlineKu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1d2540;--paper:#f2f5fc;--card:#fff;--mint:#2bb59b;--coral:#ff6b5e;--lemon:#ffd84d;--lav:#8b7cf6;--muted:#6b7394;
+--font:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root{--ink:#eef0ff;--paper:#141a30;--card:#1f2745;--muted:#9aa3c9}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);line-height:1.5}
+main{max-width:720px;margin:0 auto;padding:28px 18px 60px}
+h1{font-size:clamp(2rem,6vw,2.8rem);font-weight:800;margin:0;letter-spacing:-.03em}
+.sub{color:var(--muted);margin:2px 0 22px}
+.meter{background:var(--card);border-radius:20px;padding:20px;border:2px solid var(--ink)}
+.meter-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mood{font-size:1.5rem;font-weight:800}
+.bar{height:16px;border-radius:99px;background:rgba(127,127,160,.2);margin:12px 0 8px;overflow:hidden}
+.fill{height:100%;width:0;border-radius:99px;background:var(--mint);transition:width .5s,background .5s}
+.stats{color:var(--muted);font-size:.95rem}
+form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0}
+form .full{grid-column:1/-1}
+input,select{font:inherit;padding:12px 14px;border-radius:12px;border:2px solid rgba(127,127,160,.35);background:var(--card);color:var(--ink);width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--lav);outline-offset:2px}
+.add{font:inherit;font-weight:800;padding:13px;border-radius:12px;border:2px solid var(--ink);background:var(--lemon);color:#1d2540;cursor:pointer}
+.add:active{transform:translateY(1px)}
+ul{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+li{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:14px;border-left:8px solid var(--mint)}
+li.soon{border-color:var(--lemon)} li.urgent{border-color:var(--coral)} li.done{opacity:.55;border-color:var(--lav)}
+li.done .t{text-decoration:line-through}
+.chk{width:26px;height:26px;border-radius:8px;border:2px solid var(--ink);background:none;cursor:pointer;color:var(--ink);font-weight:800;flex:none}
+.info{flex:1;min-width:0}.t{font-weight:600}.c{font-size:.85rem;color:var(--muted)}
+.cd{font-weight:800;white-space:nowrap;font-size:.95rem}
+.del{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:480px){form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>DeadlineKu</h1>
+  <p class="sub">Pantau tugas kuliah SI semester 4 biar nggak kena kejutan.</p>
+
+  <section class="meter" aria-live="polite">
+    <div class="meter-top"><span class="mood" id="mood">Memuat…</span><span class="stats" id="stats"></span></div>
+    <div class="bar"><div class="fill" id="fill"></div></div>
+    <div class="stats" id="msg"></div>
+  </section>
+
+  <form id="f">
+    <select id="course" class="full" aria-label="Mata kuliah">
+      <option>ISAPMD (Agile & DevOps)</option><option>ISAS (Assurance & Security)</option>
+      <option>Mobile Programming</option><option>BIXD</option><option>Statistik</option>
+      <option>HCI</option><option>AI for Information Systems</option><option>Lainnya</option>
+    </select>
+    <input id="title" placeholder="Nama tugas" aria-label="Nama tugas" required>
+    <input id="deadline" type="datetime-local" aria-label="Deadline" required>
+    <button class="add full" type="submit">Tambah tugas</button>
+  </form>
+
+  <ul id="list"></ul>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let tasks=[];
+const api=(u,o)=>fetch(u,o).then(r=>r.status===204?null:r.json());
+
+function left(d){
+  const ms=new Date(d)-Date.now(), h=ms/36e5;
+  if(ms<0) return {txt:"Lewat "+fmt(-h),cls:"urgent"};
+  return {txt:fmt(h)+" lagi",cls:h<24?"urgent":h<72?"soon":""};
+}
+function fmt(h){return h<1?Math.max(1,Math.round(h*60))+" menit":h<48?Math.round(h)+" jam":Math.round(h/24)+" hari"}
+
+function render(){
+  tasks.sort((a,b)=>a.done-b.done||new Date(a.deadline)-new Date(b.deadline));
+  const open=tasks.filter(t=>!t.done);
+  const hot=open.filter(t=>left(t.deadline).cls==="urgent").length;
+  const soon=open.filter(t=>left(t.deadline).cls==="soon").length;
+  const score=Math.min(100,hot*35+soon*12);
+  const m=score>=70?["PANIK MODE 🔥","Kerjain yang paling merah dulu, kopi boleh."]:
+          score>=30?["Mulai waspada 👀","Ada yang mepet. Cicil dari sekarang."]:
+          open.length?["Santai dulu 🍃","Aman, tapi jangan lupa cek tiap hari."]:
+          ["Bebas tugas 🎉","Semua beres. Waktunya istirahat."];
+  $("mood").textContent=m[0]; $("msg").textContent=m[1];
+  $("fill").style.width=Math.max(6,score)+"%";
+  $("fill").style.background=score>=70?"var(--coral)":score>=30?"var(--lemon)":"var(--mint)";
+  $("stats").textContent=`${open.length} aktif · ${tasks.length-open.length} selesai`;
+  $("list").innerHTML=tasks.length?"":'<div class="empty">Belum ada tugas. Tambah yang pertama di atas.</div>';
+  tasks.forEach(t=>{
+    const l=left(t.deadline), li=document.createElement("li");
+    li.className=t.done?"done":l.cls;
+    li.innerHTML=`<button class="chk" aria-label="Tandai selesai">${t.done?"✓":""}</button>
+      <div class="info"><div class="t"></div><div class="c"></div></div>
+      <div class="cd">${t.done?"Selesai":l.txt}</div>
+      <button class="del" aria-label="Hapus tugas">✕</button>`;
+    li.querySelector(".t").textContent=t.title;
+    li.querySelector(".c").textContent=t.course;
+    li.querySelector(".chk").onclick=async()=>{await api("/api/tasks/"+t.id,{method:"PATCH"});load()};
+    li.querySelector(".del").onclick=async()=>{await api("/api/tasks/"+t.id,{method:"DELETE"});load()};
+    $("list").appendChild(li);
+  });
+}
+async function load(){tasks=await api("/api/tasks");render()}
+$("f").onsubmit=async e=>{
+  e.preventDefault();
+  await api("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({course:$("course").value,title:$("title").value,deadline:$("deadline").value})});
+  $("title").value="";load();
+};
+load(); setInterval(render,60000);
+</script>
+</body>
+</html>
