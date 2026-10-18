@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    image: group00/deadlineku:week6
+    container_name: deadlineku-app
+    ports:
+      - "${HOST_PORT:-8080}:3000"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - deadlineku-data:/data
+    restart: unless-stopped
+
+volumes:
+  deadlineku-data:
